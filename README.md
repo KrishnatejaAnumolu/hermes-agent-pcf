@@ -33,6 +33,8 @@ SYF_CHANNEL_ID: dise
 
 By default `LLM_PROXY_UPSTREAM_STREAMING` is `false`. Hermes can still ask for streaming; this proxy sends a normal corporate request and converts the JSON response into OpenAI-compatible server-sent events for Hermes. Set it to `true` only if the corporate endpoint supports OpenAI streaming responses.
 
+Some corporate GPT proxies return tool-call directives as assistant text instead of OpenAI `tool_calls`. This project enables `LLM_PROXY_JSON_TOOL_CALLS` by default so a leading line like `{"tool":"terminal","args":{"cmd":"..."}}` is converted back into a structured tool call for Hermes. `LLM_PROXY_JSON_TOOL_CALL_MAX` defaults to `1` so multi-step terminal work happens one completed command at a time.
+
 ## Deploy
 
 ```bash
@@ -85,6 +87,8 @@ curl https://<route>/v1/models \
 | `LLM_PROXY_UPSTREAM_STREAMING` | Whether the corporate endpoint supports streaming SSE directly. |
 | `LLM_PROXY_FORCE_MODEL` | Replaces inbound `model` with `LLM_MODEL` before forwarding. |
 | `LLM_PROXY_STRIP_MODEL` | Removes `model` from the forwarded payload if the corporate endpoint rejects it. |
+| `LLM_PROXY_JSON_TOOL_CALLS` | Converts leading JSON tool directives returned as text into OpenAI `tool_calls`. |
+| `LLM_PROXY_JSON_TOOL_CALL_MAX` | Maximum converted tool directives per model response, default `1`. |
 | `LLM_EXTRA_HEADERS` | Optional JSON object of extra headers to add to corporate requests. |
 | `HERMES_API_SERVER_TOOLSETS` | Comma-separated Hermes API toolsets exposed in API-server mode. |
 | `TIRITH_ENABLED` | Defaults to `false` to avoid runtime GitHub downloads in locked-down PCF spaces. Set to `true` if the helper is available. |

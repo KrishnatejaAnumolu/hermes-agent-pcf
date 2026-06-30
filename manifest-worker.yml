@@ -34,6 +34,8 @@ applications:
       LLM_PROXY_UPSTREAM_STREAMING: "false"
       LLM_PROXY_FORCE_MODEL: "true"
       LLM_PROXY_STRIP_MODEL: "false"
+      LLM_PROXY_JSON_TOOL_CALLS: "true"
+      LLM_PROXY_JSON_TOOL_CALL_MAX: "1"
       LLM_TIMEOUT_SECONDS: "1800"
 
       HERMES_REDACT_SECRETS: "true"

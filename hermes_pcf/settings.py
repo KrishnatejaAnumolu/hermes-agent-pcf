@@ -86,6 +86,8 @@ class Settings:
     llm_proxy_upstream_streaming: bool
     llm_proxy_force_model: bool
     llm_proxy_strip_model: bool
+    llm_proxy_json_tool_calls: bool = True
+    llm_proxy_json_tool_call_max: int = 1
     llm_extra_headers: dict[str, str] = field(default_factory=dict)
     hermes_context_length: int = 128000
     hermes_model_max_tokens: int | None = 8192
@@ -127,6 +129,8 @@ class Settings:
             llm_proxy_upstream_streaming=_bool_env("LLM_PROXY_UPSTREAM_STREAMING", False),
             llm_proxy_force_model=_bool_env("LLM_PROXY_FORCE_MODEL", True),
             llm_proxy_strip_model=_bool_env("LLM_PROXY_STRIP_MODEL", False),
+            llm_proxy_json_tool_calls=_bool_env("LLM_PROXY_JSON_TOOL_CALLS", True),
+            llm_proxy_json_tool_call_max=_int_env("LLM_PROXY_JSON_TOOL_CALL_MAX", 1),
             llm_extra_headers=_json_object_env("LLM_EXTRA_HEADERS"),
             hermes_context_length=_int_env("HERMES_MODEL_CONTEXT_LENGTH", 128000),
             hermes_model_max_tokens=_optional_int_env("HERMES_MODEL_MAX_TOKENS", "HERMES_MAX_TOKENS"),

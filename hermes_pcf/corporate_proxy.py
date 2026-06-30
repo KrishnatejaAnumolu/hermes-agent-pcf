@@ -99,13 +99,13 @@ async def chat_completions(request: web.Request) -> web.StreamResponse:
         body = await upstream_response.read()
         if requested_stream:
             return web.Response(
-                body=_completion_to_sse_bytes(settings, body),
+                body=_completion_to_sse_bytes(settings, body, payload),
                 content_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )
 
         return web.Response(
-            body=body,
+            body=_completion_to_chat_bytes(settings, body, payload),
             headers=_safe_response_headers(upstream_response.headers),
         )
 
@@ -172,11 +172,29 @@ async def _stream_upstream_sse(request: web.Request, upstream_response: Any) -> 
     return response
 
 
-def _completion_to_sse_bytes(settings: Settings, body: bytes) -> bytes:
+def _completion_to_chat_bytes(
+    settings: Settings,
+    body: bytes,
+    request_payload: dict[str, Any] | None = None,
+) -> bytes:
     if body.lstrip().startswith(b"data:"):
         return body
 
     completion = json.loads(body.decode("utf-8"))
+    completion = _completion_with_json_tool_calls(settings, completion, request_payload)
+    return json.dumps(completion, separators=(",", ":")).encode("utf-8")
+
+
+def _completion_to_sse_bytes(
+    settings: Settings,
+    body: bytes,
+    request_payload: dict[str, Any] | None = None,
+) -> bytes:
+    if body.lstrip().startswith(b"data:"):
+        return body
+
+    completion = json.loads(body.decode("utf-8"))
+    completion = _completion_with_json_tool_calls(settings, completion, request_payload)
     events = list(_completion_to_sse_events(settings, completion))
     events.append("data: [DONE]\n\n")
     return "".join(events).encode("utf-8")
@@ -238,6 +256,155 @@ def _completion_to_sse_events(settings: Settings, completion: dict[str, Any]) ->
     return events
 
 
+def _completion_with_json_tool_calls(
+    settings: Settings,
+    completion: dict[str, Any],
+    request_payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not settings.llm_proxy_json_tool_calls or request_payload is None:
+        return completion
+
+    allowed_tool_names = _request_tool_names(request_payload)
+    if not allowed_tool_names:
+        return completion
+
+    choices = completion.get("choices")
+    if not isinstance(choices, list):
+        return completion
+
+    changed = False
+    converted_count = 0
+    converted_choices: list[Any] = []
+    for choice in choices:
+        if not isinstance(choice, dict):
+            converted_choices.append(choice)
+            continue
+
+        message_key = "message" if isinstance(choice.get("message"), dict) else "delta"
+        message = choice.get(message_key)
+        if not isinstance(message, dict) or message.get("tool_calls"):
+            converted_choices.append(choice)
+            continue
+
+        tool_calls = _json_tool_calls_from_content(
+            message.get("content"),
+            allowed_tool_names,
+            max(0, settings.llm_proxy_json_tool_call_max),
+        )
+        if not tool_calls:
+            converted_choices.append(choice)
+            continue
+
+        converted_message = dict(message)
+        converted_message["role"] = converted_message.get("role") or "assistant"
+        converted_message["content"] = None
+        converted_message["tool_calls"] = tool_calls
+
+        converted_choice = dict(choice)
+        converted_choice[message_key] = converted_message
+        converted_choice["finish_reason"] = "tool_calls"
+        converted_choices.append(converted_choice)
+        changed = True
+        converted_count += len(tool_calls)
+
+    if not changed:
+        return completion
+
+    LOGGER.warning(
+        "Converted %s JSON tool directive(s) from model text into structured tool_calls",
+        converted_count,
+    )
+    converted_completion = dict(completion)
+    converted_completion["choices"] = converted_choices
+    return converted_completion
+
+
+def _request_tool_names(request_payload: dict[str, Any]) -> set[str]:
+    tool_names: set[str] = set()
+    tools = request_payload.get("tools")
+    if not isinstance(tools, list):
+        return tool_names
+
+    for tool in tools:
+        if not isinstance(tool, dict):
+            continue
+        function = tool.get("function")
+        if isinstance(function, dict) and isinstance(function.get("name"), str):
+            tool_names.add(function["name"])
+            continue
+        if isinstance(tool.get("name"), str):
+            tool_names.add(tool["name"])
+
+    return tool_names
+
+
+def _json_tool_calls_from_content(content: Any, allowed_tool_names: set[str], max_calls: int) -> list[dict[str, Any]]:
+    if max_calls <= 0 or not isinstance(content, str):
+        return []
+
+    calls: list[dict[str, Any]] = []
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("```"):
+            continue
+
+        directive = _parse_tool_directive(line, allowed_tool_names)
+        if directive is None:
+            return calls
+
+        calls.append(_openai_tool_call(directive[0], directive[1]))
+        if len(calls) >= max_calls:
+            return calls
+
+    return calls
+
+
+def _parse_tool_directive(line: str, allowed_tool_names: set[str]) -> tuple[str, dict[str, Any]] | None:
+    if not line.startswith(("{", "[")):
+        return None
+
+    try:
+        parsed = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+
+    if isinstance(parsed, list):
+        if not parsed or not isinstance(parsed[0], dict):
+            return None
+        parsed = parsed[0]
+    if not isinstance(parsed, dict):
+        return None
+
+    name = parsed.get("tool") or parsed.get("name")
+    if not isinstance(name, str) or name not in allowed_tool_names:
+        return None
+
+    args = parsed.get("args", parsed.get("arguments", {}))
+    if isinstance(args, str):
+        try:
+            parsed_args = json.loads(args)
+        except json.JSONDecodeError:
+            parsed_args = {"input": args}
+        args = parsed_args
+    if not isinstance(args, dict):
+        args = {"input": args}
+
+    return name, args
+
+
+def _openai_tool_call(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": f"call_{uuid.uuid4().hex[:24]}",
+        "type": "function",
+        "function": {
+            "name": name,
+            "arguments": json.dumps(arguments, separators=(",", ":")),
+        },
+    }
+
+
 def _chunk(
     completion_id: str,
     model: str,
@@ -265,4 +432,3 @@ def _as_bool(value: Any) -> bool:
     if isinstance(value, str):
         return value.lower() in {"1", "true", "yes", "y", "on"}
     return bool(value)
-

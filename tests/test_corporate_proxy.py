@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from hermes_pcf.corporate_proxy import (
+    _completion_to_chat_bytes,
     _build_upstream_headers,
     _build_upstream_payload,
     _completion_to_sse_bytes,
@@ -61,6 +62,79 @@ def test_non_streaming_completion_can_be_wrapped_as_openai_sse() -> None:
     assert '"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}' in sse
 
 
+def test_json_tool_directive_content_is_wrapped_as_tool_call_sse() -> None:
+    settings = _settings()
+    request_payload = {
+        "tools": [
+            {
+                "type": "function",
+                "function": {"name": "terminal"},
+            }
+        ]
+    }
+    completion = {
+        "id": "chatcmpl-tool",
+        "created": 123,
+        "model": "GPT-5.2",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": '\n'.join(
+                        [
+                            '{"tool":"terminal","args":{"cmd":"python -m hermes_pcf.bitbucket_clone https://bitbucket.glb.syfbank.com/scm/eui/vista.git"}}',
+                            '{"tool":"terminal","args":{"cmd":"pwd"}}',
+                        ]
+                    ),
+                },
+                "finish_reason": "stop",
+            }
+        ],
+    }
+
+    sse = _completion_to_sse_bytes(settings, json.dumps(completion).encode(), request_payload).decode()
+
+    assert '"finish_reason":"tool_calls"' in sse
+    assert '"name":"terminal"' in sse
+    assert "hermes_pcf.bitbucket_clone" in sse
+    assert "pwd" not in sse
+
+
+def test_json_tool_directive_content_is_wrapped_as_tool_call_chat_response() -> None:
+    settings = _settings()
+    request_payload = {
+        "tools": [
+            {
+                "type": "function",
+                "function": {"name": "terminal"},
+            }
+        ]
+    }
+    completion = {
+        "id": "chatcmpl-tool",
+        "created": 123,
+        "model": "GPT-5.2",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": '{"tool":"terminal","args":{"cmd":"pwd"}}',
+                },
+                "finish_reason": "stop",
+            }
+        ],
+    }
+
+    converted = json.loads(_completion_to_chat_bytes(settings, json.dumps(completion).encode(), request_payload))
+
+    message = converted["choices"][0]["message"]
+    assert converted["choices"][0]["finish_reason"] == "tool_calls"
+    assert message["content"] is None
+    assert message["tool_calls"][0]["function"]["name"] == "terminal"
+
+
 def _settings(**overrides: object) -> Settings:
     values = dict(
         app_name="test",
@@ -86,4 +160,3 @@ def _settings(**overrides: object) -> Settings:
     )
     values.update(overrides)
     return Settings(**values)
-
