@@ -49,6 +49,9 @@ def build_hermes_config(settings: Settings) -> dict[str, Any]:
         "user_profile": {"enabled": settings.hermes_user_profile_enabled},
         "agent": {
             "coding_context": "on",
+            "tool_use_enforcement": True,
+            "intent_ack_continuation": True,
+            "task_completion_guidance": True,
             "environment_hint": _environment_hint(settings),
             "coding_instructions": _coding_instructions(settings),
         },
@@ -101,6 +104,10 @@ def _environment_hint(settings: Settings) -> str:
 
 def _coding_instructions(settings: Settings) -> list[str]:
     return [
+        (
+            "When a user asks you to clone, inspect, explain, or review a Bitbucket repository, "
+            "do not stop after describing the plan. Call the terminal tool and run the Bitbucket clone helper first."
+        ),
         (
             "For Bitbucket Server repositories, first run "
             "`python -m hermes_pcf.bitbucket_clone <repo-url> [--branch <branch>]` "
