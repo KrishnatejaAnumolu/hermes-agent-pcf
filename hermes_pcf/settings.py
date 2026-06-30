@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 
 PLACEHOLDER_PREFIXES = ("<replace", "replace-", "changeme", "todo")
@@ -97,6 +97,10 @@ class Settings:
     terminal_timeout: int = 180
     tirith_enabled: bool = False
     tirith_fail_open: bool = True
+    bitbucket_server_url: str = "https://bitbucket.glb.syfbank.com"
+    bitbucket_server_bearer_token: str = ""
+    bitbucket_allowed_projects: list[str] = field(default_factory=lambda: ["EUI"])
+    bitbucket_workdir: Path = Path("workspace/repos")
     overwrite_config: bool = True
 
     @classmethod
@@ -130,10 +134,14 @@ class Settings:
             hermes_reasoning_effort=_env("HERMES_REASONING_EFFORT", "medium"),
             hermes_memory_enabled=_bool_env("HERMES_MEMORY_ENABLED", False),
             hermes_user_profile_enabled=_bool_env("HERMES_USER_PROFILE_ENABLED", False),
-            hermes_api_server_toolsets=_csv_env("HERMES_API_SERVER_TOOLSETS", "web,file,skills,todo"),
+            hermes_api_server_toolsets=_csv_env("HERMES_API_SERVER_TOOLSETS", "web,file,terminal,skills,todo"),
             terminal_timeout=_int_env("TERMINAL_TIMEOUT", 180),
             tirith_enabled=_bool_env("TIRITH_ENABLED", False),
             tirith_fail_open=_bool_env("TIRITH_FAIL_OPEN", True),
+            bitbucket_server_url=_env("BITBUCKET_SERVER_URL", "https://bitbucket.glb.syfbank.com"),
+            bitbucket_server_bearer_token=_env("BITBUCKET_SERVER_BEARER_TOKEN"),
+            bitbucket_allowed_projects=_csv_env("BITBUCKET_ALLOWED_PROJECTS", "EUI"),
+            bitbucket_workdir=Path(_env("BITBUCKET_WORKDIR", "workspace/repos")),
             overwrite_config=_bool_env("HERMES_OVERWRITE_CONFIG", True),
         )
 
@@ -144,6 +152,14 @@ class Settings:
     @property
     def hermes_llm_base_url(self) -> str:
         return f"http://{self.llm_proxy_host}:{self.llm_proxy_port}/v1"
+
+    @property
+    def bitbucket_configured(self) -> bool:
+        return bool(self.bitbucket_server_url and not _looks_like_placeholder(self.bitbucket_server_bearer_token))
+
+    @property
+    def bitbucket_origin(self) -> str:
+        return self.bitbucket_server_url.rstrip("/")
 
     def validate(self) -> None:
         if _looks_like_placeholder(self.api_server_key) or len(self.api_server_key) < 16:
@@ -156,3 +172,7 @@ class Settings:
             raise ValueError("LLM_CHAT_PATH must start with /")
         if not self.llm_model:
             raise ValueError("LLM_MODEL must be set")
+        if self.bitbucket_server_url:
+            parsed = urlparse(self.bitbucket_server_url)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise ValueError("BITBUCKET_SERVER_URL must be an http(s) URL")

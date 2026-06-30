@@ -88,6 +88,27 @@ curl https://<route>/v1/models \
 | `LLM_EXTRA_HEADERS` | Optional JSON object of extra headers to add to corporate requests. |
 | `HERMES_API_SERVER_TOOLSETS` | Comma-separated Hermes API toolsets exposed in API-server mode. |
 | `TIRITH_ENABLED` | Defaults to `false` to avoid runtime GitHub downloads in locked-down PCF spaces. Set to `true` if the helper is available. |
+| `BITBUCKET_SERVER_URL` | Bitbucket Server origin, default `https://bitbucket.glb.syfbank.com`. |
+| `BITBUCKET_SERVER_BEARER_TOKEN` | Bearer token used by the Bitbucket clone helper. |
+| `BITBUCKET_ALLOWED_PROJECTS` | Comma-separated project allowlist for clone helper, default `EUI`. |
+| `BITBUCKET_WORKDIR` | Directory where Bitbucket repos are cloned. |
+
+## Bitbucket Repos
+
+The API server enables Hermes terminal tools and includes a helper for Bitbucket Server URLs:
+
+```bash
+python -m hermes_pcf.bitbucket_clone https://bitbucket.glb.syfbank.com/projects/EUI/repos/vista/
+python -m hermes_pcf.bitbucket_clone https://bitbucket.glb.syfbank.com/projects/EUI/repos/vista/ --branch develop
+```
+
+The helper converts Bitbucket Server web URLs to `/scm/<project>/<repo>.git`, injects the bearer token into the Git subprocess without writing it to global Git config, and clones or updates under `BITBUCKET_WORKDIR`.
+
+Example prompt:
+
+```text
+Clone https://bitbucket.glb.syfbank.com/projects/EUI/repos/vista/ and explain how login routing works.
+```
 
 ## Local Smoke Test
 

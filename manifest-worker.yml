@@ -43,7 +43,13 @@ applications:
       HERMES_REASONING_EFFORT: medium
       HERMES_MEMORY_ENABLED: "false"
       HERMES_USER_PROFILE_ENABLED: "false"
-      HERMES_API_SERVER_TOOLSETS: web,file,skills,todo
+      HERMES_API_SERVER_TOOLSETS: web,file,terminal,skills,todo
       TERMINAL_TIMEOUT: "180"
       TIRITH_ENABLED: "false"
       TIRITH_FAIL_OPEN: "true"
+
+      BITBUCKET_SERVER_URL: https://bitbucket.glb.syfbank.com
+      BITBUCKET_SERVER_BEARER_TOKEN: "<replace-with-bitbucket-server-bearer-token>"
+      BITBUCKET_ALLOWED_PROJECTS: EUI
+      BITBUCKET_WORKDIR: /home/vcap/app/workspace/repos
+      GIT_TERMINAL_PROMPT: "0"
