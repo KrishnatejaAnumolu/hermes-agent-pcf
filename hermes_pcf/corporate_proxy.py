@@ -112,6 +112,10 @@ async def chat_completions(request: web.Request) -> web.StreamResponse:
 
 def _build_upstream_payload(settings: Settings, payload: dict[str, Any]) -> dict[str, Any]:
     upstream_payload = dict(payload)
+    upstream_payload["messages"] = _repair_orphan_tool_messages(
+        upstream_payload.get("messages"),
+        _request_tool_names(upstream_payload),
+    )
 
     if settings.llm_proxy_strip_model:
         upstream_payload.pop("model", None)
@@ -123,6 +127,97 @@ def _build_upstream_payload(settings: Settings, payload: dict[str, Any]) -> dict
         upstream_payload.pop("stream_options", None)
 
     return upstream_payload
+
+
+def _repair_orphan_tool_messages(messages: Any, allowed_tool_names: set[str]) -> Any:
+    if not isinstance(messages, list):
+        return messages
+
+    repaired_count = 0
+    normalized: list[Any] = []
+    index = 0
+    while index < len(messages):
+        message = messages[index]
+        if not _is_tool_message(message):
+            normalized.append(message)
+            index += 1
+            continue
+
+        group: list[dict[str, Any]] = []
+        while index < len(messages) and _is_tool_message(messages[index]):
+            group.append(_normalized_tool_message(messages[index], len(normalized) + len(group)))
+            index += 1
+
+        previous = normalized[-1] if normalized else None
+        if not _assistant_covers_tool_group(previous, group):
+            normalized.append(_synthetic_assistant_for_tool_group(group, allowed_tool_names))
+            repaired_count += len(group)
+
+        normalized.extend(group)
+
+    if repaired_count:
+        LOGGER.warning(
+            "Inserted synthetic assistant tool_calls before %s orphan tool message(s)",
+            repaired_count,
+        )
+
+    return normalized
+
+
+def _is_tool_message(message: Any) -> bool:
+    return isinstance(message, dict) and message.get("role") == "tool"
+
+
+def _normalized_tool_message(message: dict[str, Any], fallback_index: int) -> dict[str, Any]:
+    normalized = dict(message)
+    tool_call_id = normalized.get("tool_call_id")
+    if not isinstance(tool_call_id, str) or not tool_call_id:
+        normalized["tool_call_id"] = f"call_repaired_{fallback_index}_{uuid.uuid4().hex[:12]}"
+    return normalized
+
+
+def _assistant_covers_tool_group(previous: Any, group: list[dict[str, Any]]) -> bool:
+    if not isinstance(previous, dict) or previous.get("role") != "assistant":
+        return False
+
+    tool_calls = previous.get("tool_calls")
+    if not isinstance(tool_calls, list):
+        return False
+
+    assistant_ids = {call.get("id") for call in tool_calls if isinstance(call, dict)}
+    return all(message.get("tool_call_id") in assistant_ids for message in group)
+
+
+def _synthetic_assistant_for_tool_group(
+    group: list[dict[str, Any]],
+    allowed_tool_names: set[str],
+) -> dict[str, Any]:
+    return {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {
+                "id": str(message["tool_call_id"]),
+                "type": "function",
+                "function": {
+                    "name": _tool_name_for_repair(message, allowed_tool_names),
+                    "arguments": "{}",
+                },
+            }
+            for message in group
+        ],
+    }
+
+
+def _tool_name_for_repair(message: dict[str, Any], allowed_tool_names: set[str]) -> str:
+    name = message.get("name")
+    if isinstance(name, str) and (not allowed_tool_names or name in allowed_tool_names):
+        return name
+    if "terminal" in allowed_tool_names:
+        return "terminal"
+    if allowed_tool_names:
+        return sorted(allowed_tool_names)[0]
+    return "terminal"
 
 
 def _build_upstream_headers(settings: Settings, request: web.Request | None = None) -> dict[str, str]:

@@ -27,6 +27,65 @@ def test_build_upstream_payload_forces_model_and_removes_stream() -> None:
     assert "stream_options" not in upstream_payload
 
 
+def test_build_upstream_payload_repairs_orphan_tool_messages() -> None:
+    settings = _settings()
+    payload = {
+        "model": "anything",
+        "messages": [
+            {"role": "user", "content": "clone the repo"},
+            {
+                "role": "tool",
+                "tool_call_id": "call_clone",
+                "name": "terminal",
+                "content": "cloned repo to /home/vcap/app/workspace/repos/EUI/vista",
+            },
+        ],
+        "tools": [{"type": "function", "function": {"name": "terminal"}}],
+    }
+
+    upstream_payload = _build_upstream_payload(settings, payload)
+
+    messages = upstream_payload["messages"]
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["content"] is None
+    assert messages[1]["tool_calls"][0]["id"] == "call_clone"
+    assert messages[1]["tool_calls"][0]["function"]["name"] == "terminal"
+    assert messages[2]["role"] == "tool"
+    assert messages[2]["tool_call_id"] == "call_clone"
+
+
+def test_build_upstream_payload_keeps_valid_tool_message_sequence() -> None:
+    settings = _settings()
+    payload = {
+        "model": "anything",
+        "messages": [
+            {"role": "user", "content": "clone the repo"},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_clone",
+                        "type": "function",
+                        "function": {"name": "terminal", "arguments": "{}"},
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call_clone",
+                "name": "terminal",
+                "content": "cloned repo",
+            },
+        ],
+        "tools": [{"type": "function", "function": {"name": "terminal"}}],
+    }
+
+    upstream_payload = _build_upstream_payload(settings, payload)
+
+    assert upstream_payload["messages"] == payload["messages"]
+
+
 def test_build_upstream_headers_use_corporate_header_names() -> None:
     settings = _settings()
 
