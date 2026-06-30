@@ -1,4 +1,6 @@
-hermes-agent @ git+https://github.com/nousresearch/hermes-agent.git@bff61f558f2a166de819ecc424c5ed5462d7240c
+--no-index
+--find-links vendor
+
+hermes-agent==0.17.0
 aiohttp==3.13.4
 PyYAML>=6.0.2,<7
-

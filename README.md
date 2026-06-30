@@ -11,6 +11,9 @@ Hermes talks to a local OpenAI-compatible proxy at `http://127.0.0.1:8787/v1`. T
 - `Procfile` starts `python -m hermes_pcf.start`.
 - `hermes_pcf/start.py` writes the runtime Hermes config and launches Hermes.
 - `hermes_pcf/corporate_proxy.py` translates OpenAI-style requests into the corporate proxy format.
+- `vendor/` contains the pinned Hermes wheel and Linux Python 3.11 dependency wheels so PCF staging does not need GitHub or PyPI egress.
+
+The `requirements.txt` file intentionally uses `--no-index` and `--find-links vendor`. This avoids staging failures in PCF foundations where outbound GitHub access is blocked or unstable.
 
 ## Configure
 
