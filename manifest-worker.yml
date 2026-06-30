@@ -1,0 +1,49 @@
+---
+applications:
+  - name: hermes-agent-worker-pcf
+    path: .
+    memory: 2G
+    disk_quota: 4G
+    instances: 1
+    no-route: true
+    buildpacks:
+      - python_buildpack
+    command: python -m hermes_pcf.start
+    health-check-type: process
+    timeout: 180
+    env:
+      PYTHONUNBUFFERED: "1"
+      LOG_LEVEL: INFO
+
+      API_SERVER_KEY: "<replace-with-strong-api-server-key>"
+      API_SERVER_MODEL_NAME: hermes-agent
+      API_SERVER_CORS_ORIGINS: ""
+
+      HERMES_HOME: /home/vcap/app/.hermes
+      HERMES_WORKDIR: /home/vcap/app/workspace
+
+      LLM_BASE_URL: https://syf-chat-gpt-service.app.uat.pcf.syfbank.com
+      LLM_CHAT_PATH: /gpt/chat/completions
+      LLM_API_KEY: "<replace-with-corporate-llm-api-key>"
+      LLM_MODEL: GPT-5.2
+      LLM_API_VERSION: GPT-5.2
+      SYF_CHANNEL_ID: dise
+
+      LLM_PROXY_HOST: 127.0.0.1
+      LLM_PROXY_PORT: 8787
+      LLM_PROXY_UPSTREAM_STREAMING: "false"
+      LLM_PROXY_FORCE_MODEL: "true"
+      LLM_PROXY_STRIP_MODEL: "false"
+      LLM_TIMEOUT_SECONDS: "1800"
+
+      HERMES_REDACT_SECRETS: "true"
+      HERMES_MODEL_CONTEXT_LENGTH: "128000"
+      HERMES_MODEL_MAX_TOKENS: "8192"
+      HERMES_MAX_TURNS: "60"
+      HERMES_REASONING_EFFORT: medium
+      HERMES_MEMORY_ENABLED: "false"
+      HERMES_USER_PROFILE_ENABLED: "false"
+      HERMES_API_SERVER_TOOLSETS: web,file,skills,todo
+      TERMINAL_TIMEOUT: "180"
+      TIRITH_ENABLED: "false"
+      TIRITH_FAIL_OPEN: "true"
