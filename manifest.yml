@@ -13,6 +13,7 @@ applications:
     timeout: 180
     env:
       PYTHONUNBUFFERED: "1"
+      PYTHONPATH: /home/vcap/app
       LOG_LEVEL: INFO
 
       # Hermes gateway API auth. Clients call this app with:

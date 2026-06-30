@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from hermes_pcf.settings import Settings
-from hermes_pcf.start import build_hermes_config
+from hermes_pcf.start import app_root, build_hermes_config, prepare_environment
 
 
 def test_agent_config_forces_tool_follow_through() -> None:
@@ -13,6 +14,16 @@ def test_agent_config_forces_tool_follow_through() -> None:
     assert agent["tool_use_enforcement"] is True
     assert agent["intent_ack_continuation"] is True
     assert "do not stop after describing the plan" in agent["coding_instructions"][0]
+    assert "JSON tool directive" in agent["coding_instructions"][1]
+    assert "PYTHONPATH" in config["terminal"]["env_passthrough"]
+
+
+def test_prepare_environment_makes_app_package_importable(monkeypatch) -> None:
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+
+    prepare_environment(_settings())
+
+    assert app_root() in os.environ["PYTHONPATH"].split(os.pathsep)
 
 
 def _settings() -> Settings:

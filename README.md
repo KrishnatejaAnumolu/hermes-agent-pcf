@@ -78,6 +78,7 @@ curl https://<route>/v1/models \
 | --- | --- |
 | `API_SERVER_KEY` | Bearer token required by the public Hermes API. Must be at least 16 characters. |
 | `API_SERVER_MODEL_NAME` | Model name exposed by Hermes, default `hermes-agent`. |
+| `PYTHONPATH` | Includes `/home/vcap/app` so terminal tools can run packaged helpers from the workspace directory. |
 | `LLM_BASE_URL` | Corporate proxy origin, without the chat path. |
 | `LLM_CHAT_PATH` | Corporate chat-completions path, default `/gpt/chat/completions`. |
 | `LLM_API_KEY` | Corporate LLM API key, sent as `api-key`. |

@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import shutil
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -13,6 +14,10 @@ from .corporate_proxy import create_app
 from .settings import Settings
 
 LOGGER = logging.getLogger(__name__)
+
+
+def app_root() -> str:
+    return str(Path(__file__).resolve().parent.parent)
 
 
 def configure_logging() -> None:
@@ -65,6 +70,7 @@ def build_hermes_config(settings: Settings) -> dict[str, Any]:
             "default_workdir": str(settings.hermes_workdir),
             "timeout": settings.terminal_timeout,
             "env_passthrough": [
+                "PYTHONPATH",
                 "BITBUCKET_SERVER_URL",
                 "BITBUCKET_SERVER_BEARER_TOKEN",
                 "BITBUCKET_ALLOWED_PROJECTS",
@@ -109,6 +115,10 @@ def _coding_instructions(settings: Settings) -> list[str]:
             "do not stop after describing the plan. Call the terminal tool and run the Bitbucket clone helper first."
         ),
         (
+            "If structured tool calls are unavailable, emit exactly one leading JSON tool directive with no prose, "
+            'for example {"tool":"terminal","args":{"cmd":"python -m hermes_pcf.bitbucket_clone <repo-url>"}}.'
+        ),
+        (
             "For Bitbucket Server repositories, first run "
             "`python -m hermes_pcf.bitbucket_clone <repo-url> [--branch <branch>]` "
             "from the terminal. It accepts web URLs such as "
@@ -141,6 +151,12 @@ def write_hermes_config(settings: Settings) -> None:
 
 
 def prepare_environment(settings: Settings) -> None:
+    pythonpath_parts = [app_root()]
+    existing_pythonpath = os.environ.get("PYTHONPATH")
+    if existing_pythonpath:
+        pythonpath_parts.extend(part for part in existing_pythonpath.split(os.pathsep) if part)
+    os.environ["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(pythonpath_parts))
+
     os.environ["HERMES_HOME"] = str(settings.hermes_home)
     os.environ["TERMINAL_CWD"] = str(settings.hermes_workdir)
     os.environ["GIT_TERMINAL_PROMPT"] = "0"
