@@ -116,7 +116,7 @@ def _coding_instructions(settings: Settings) -> list[str]:
         ),
         (
             "If structured tool calls are unavailable, emit exactly one leading JSON tool directive with no prose, "
-            'for example {"tool":"terminal","args":{"cmd":"python -m hermes_pcf.bitbucket_clone <repo-url>"}}.'
+            'for example {"tool":"terminal","args":{"command":"python -m hermes_pcf.bitbucket_clone <repo-url>"}}.'
         ),
         (
             "For Bitbucket Server repositories, first run "

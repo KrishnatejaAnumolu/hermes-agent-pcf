@@ -486,7 +486,29 @@ def _parse_tool_directive(line: str, allowed_tool_names: set[str]) -> tuple[str,
     if not isinstance(args, dict):
         args = {"input": args}
 
+    args = _normalize_tool_arguments(name, args)
     return name, args
+
+
+def _normalize_tool_arguments(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    if name != "terminal":
+        return arguments
+
+    normalized = dict(arguments)
+    if "command" not in normalized and "cmd" in normalized:
+        normalized["command"] = normalized.pop("cmd")
+    if "workdir" not in normalized:
+        for alias in ("cwd", "working_directory"):
+            if alias in normalized:
+                normalized["workdir"] = normalized.pop(alias)
+                break
+    if "timeout" not in normalized and "timeout_ms" in normalized:
+        timeout_ms = normalized.pop("timeout_ms")
+        try:
+            normalized["timeout"] = max(1, int(timeout_ms) // 1000)
+        except (TypeError, ValueError):
+            pass
+    return normalized
 
 
 def _openai_tool_call(name: str, arguments: dict[str, Any]) -> dict[str, Any]:

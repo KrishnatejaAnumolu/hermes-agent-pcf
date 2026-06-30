@@ -157,10 +157,12 @@ def test_json_tool_directive_content_is_wrapped_as_tool_call_sse() -> None:
     assert '"finish_reason":"tool_calls"' in sse
     assert '"name":"terminal"' in sse
     assert "hermes_pcf.bitbucket_clone" in sse
+    assert '\\"command\\":\\"python -m hermes_pcf.bitbucket_clone' in sse
+    assert '\\"cmd\\"' not in sse
     assert "pwd" not in sse
 
 
-def test_json_tool_directive_content_is_wrapped_as_tool_call_chat_response() -> None:
+def test_json_tool_directive_content_is_wrapped_as_normalized_tool_call_chat_response() -> None:
     settings = _settings()
     request_payload = {
         "tools": [
@@ -179,7 +181,7 @@ def test_json_tool_directive_content_is_wrapped_as_tool_call_chat_response() -> 
                 "index": 0,
                 "message": {
                     "role": "assistant",
-                    "content": '{"tool":"terminal","args":{"cmd":"pwd"}}',
+                    "content": '{"tool":"terminal","args":{"cmd":"pwd","cwd":"/tmp","timeout_ms":5000}}',
                 },
                 "finish_reason": "stop",
             }
@@ -192,6 +194,8 @@ def test_json_tool_directive_content_is_wrapped_as_tool_call_chat_response() -> 
     assert converted["choices"][0]["finish_reason"] == "tool_calls"
     assert message["content"] is None
     assert message["tool_calls"][0]["function"]["name"] == "terminal"
+    arguments = json.loads(message["tool_calls"][0]["function"]["arguments"])
+    assert arguments == {"command": "pwd", "workdir": "/tmp", "timeout": 5}
 
 
 def _settings(**overrides: object) -> Settings:
