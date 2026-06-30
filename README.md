@@ -105,9 +105,11 @@ The API server enables Hermes terminal tools and includes a helper for Bitbucket
 ```bash
 python -m hermes_pcf.bitbucket_clone https://bitbucket.glb.syfbank.com/projects/EUI/repos/vista/
 python -m hermes_pcf.bitbucket_clone https://bitbucket.glb.syfbank.com/projects/EUI/repos/vista/ --branch develop
+python -m hermes_pcf.bitbucket_pr https://bitbucket.glb.syfbank.com/projects/EUI/repos/vista/pull-requests/2331/overview
 ```
 
 The helper converts Bitbucket Server web URLs to `/scm/<project>/<repo>.git`, injects the bearer token into the Git subprocess without writing it to global Git config, and clones or updates under `BITBUCKET_WORKDIR`.
+The PR helper calls Bitbucket Server REST API with the same bearer token and prints JSON containing the PR title, description, source/target refs, author, and reviewers.
 
 Example prompt:
 

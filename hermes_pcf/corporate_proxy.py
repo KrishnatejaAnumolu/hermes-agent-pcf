@@ -437,15 +437,22 @@ def _json_tool_calls_from_content(content: Any, allowed_tool_names: set[str], ma
     if max_calls <= 0 or not isinstance(content, str):
         return []
 
+    decoder = json.JSONDecoder()
     calls: list[dict[str, Any]] = []
-    for raw_line in content.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        if line.startswith("```"):
-            continue
+    index = 0
+    while index < len(content):
+        index = _skip_tool_directive_separators(content, index)
+        if index >= len(content):
+            return calls
+        if content[index] not in "{[":
+            return calls
 
-        directive = _parse_tool_directive(line, allowed_tool_names)
+        try:
+            parsed, index = decoder.raw_decode(content, index)
+        except json.JSONDecodeError:
+            return calls
+
+        directive = _parse_tool_directive_value(parsed, allowed_tool_names)
         if directive is None:
             return calls
 
@@ -454,6 +461,20 @@ def _json_tool_calls_from_content(content: Any, allowed_tool_names: set[str], ma
             return calls
 
     return calls
+
+
+def _skip_tool_directive_separators(content: str, index: int) -> int:
+    while index < len(content) and content[index].isspace():
+        index += 1
+
+    if content.startswith("```", index):
+        index += 3
+        while index < len(content) and content[index] not in "\r\n":
+            index += 1
+        while index < len(content) and content[index] in "\r\n":
+            index += 1
+
+    return index
 
 
 def _parse_tool_directive(line: str, allowed_tool_names: set[str]) -> tuple[str, dict[str, Any]] | None:
@@ -465,6 +486,10 @@ def _parse_tool_directive(line: str, allowed_tool_names: set[str]) -> tuple[str,
     except json.JSONDecodeError:
         return None
 
+    return _parse_tool_directive_value(parsed, allowed_tool_names)
+
+
+def _parse_tool_directive_value(parsed: Any, allowed_tool_names: set[str]) -> tuple[str, dict[str, Any]] | None:
     if isinstance(parsed, list):
         if not parsed or not isinstance(parsed[0], dict):
             return None

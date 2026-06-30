@@ -162,6 +162,43 @@ def test_json_tool_directive_content_is_wrapped_as_tool_call_sse() -> None:
     assert "pwd" not in sse
 
 
+def test_concatenated_json_tool_directive_content_is_wrapped_as_tool_call_sse() -> None:
+    settings = _settings()
+    request_payload = {
+        "tools": [
+            {"type": "function", "function": {"name": "terminal"}},
+            {"type": "function", "function": {"name": "web_fetch"}},
+        ]
+    }
+    completion = {
+        "id": "chatcmpl-tool",
+        "created": 123,
+        "model": "GPT-5.2",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": (
+                        '{"tool":"terminal","args":{"command":"python -m hermes_pcf.bitbucket_pr https://bitbucket.glb.syfbank.com/projects/EUI/repos/vista/pull-requests/2331/overview","cwd":"/home/vcap/app/workspace"}}'
+                        '{"tool":"web_fetch","args":{"url":"https://bitbucket.glb.syfbank.com/projects/EUI/repos/vista/pull-requests/2331/overview"}}'
+                        "\nI tried to fetch the PR but hit auth."
+                    ),
+                },
+                "finish_reason": "stop",
+            }
+        ],
+    }
+
+    sse = _completion_to_sse_bytes(settings, json.dumps(completion).encode(), request_payload).decode()
+
+    assert '"finish_reason":"tool_calls"' in sse
+    assert '"name":"terminal"' in sse
+    assert "hermes_pcf.bitbucket_pr" in sse
+    assert "web_fetch" not in sse
+    assert "I tried to fetch" not in sse
+
+
 def test_json_tool_directive_content_is_wrapped_as_normalized_tool_call_chat_response() -> None:
     settings = _settings()
     request_payload = {

@@ -115,6 +115,11 @@ def _coding_instructions(settings: Settings) -> list[str]:
             "do not stop after describing the plan. Call the terminal tool and run the Bitbucket clone helper first."
         ),
         (
+            "When a user asks about a Bitbucket pull request URL, do not use web_fetch first. "
+            "Call the terminal tool and run "
+            "`python -m hermes_pcf.bitbucket_pr <pull-request-url>` to fetch the title, description, refs, and reviewers."
+        ),
+        (
             "If structured tool calls are unavailable, emit exactly one leading JSON tool directive with no prose, "
             'for example {"tool":"terminal","args":{"command":"python -m hermes_pcf.bitbucket_clone <repo-url>"}}.'
         ),

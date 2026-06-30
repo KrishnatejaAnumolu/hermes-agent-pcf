@@ -14,7 +14,8 @@ def test_agent_config_forces_tool_follow_through() -> None:
     assert agent["tool_use_enforcement"] is True
     assert agent["intent_ack_continuation"] is True
     assert "do not stop after describing the plan" in agent["coding_instructions"][0]
-    assert "JSON tool directive" in agent["coding_instructions"][1]
+    assert any("hermes_pcf.bitbucket_pr" in item for item in agent["coding_instructions"])
+    assert any("JSON tool directive" in item for item in agent["coding_instructions"])
     assert "PYTHONPATH" in config["terminal"]["env_passthrough"]
 
 
